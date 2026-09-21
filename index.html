@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>실시간 데이터 통계분석 대시보드</title>
+  
+  <!-- Pretendard Font -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Plotly.js CDN -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  
+  <!-- SheetJS (xlsx) CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  
+  <!-- jStat CDN for Statistical Analysis -->
+  <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-[#0b0f19] text-gray-100 min-h-screen flex flex-col font-sans">
+
+  <!-- Drag and Drop Overlay -->
+  <div id="dropZone" class="fixed inset-0 z-[100] bg-blue-900/80 backdrop-blur-md flex flex-col items-center justify-center border-4 border-dashed border-blue-400 m-6 rounded-2xl hidden transition-all">
+    <i data-lucide="file-spreadsheet" class="w-20 h-20 text-blue-300 mb-4 animate-bounce"></i>
+    <h2 class="text-2xl font-bold text-white mb-2">엑셀 파일을 여기에 놓아주세요</h2>
+    <p class="text-blue-200 text-sm">브라우저 내 메모리에서 안전하게 즉시 분석됩니다.</p>
+  </div>
+
+  <!-- Header -->
+  <header class="dashboard-header flex items-center justify-between border-b border-gray-800 px-6 py-3.5">
+    <div class="flex items-center gap-3">
+      <div class="p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400">
+        <i data-lucide="activity" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-base font-bold text-white tracking-tight">Data Analytics Intelligence Dashboard</h1>
+          <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Client InMemory</span>
+        </div>
+        <p class="text-xs text-gray-400">실시간 원클릭 통계분석 & 센서 데이터 진단 플랫폼</p>
+      </div>
+    </div>
+
+    <!-- Data Controls -->
+    <div class="flex items-center gap-3">
+      <div class="hidden sm:flex flex-col text-right mr-2">
+        <span class="text-[11px] text-gray-400">현재 데이터셋</span>
+        <span id="currentFileName" class="text-xs font-semibold text-blue-400 truncate max-w-[200px]">로딩 중...</span>
+      </div>
+
+      <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden">
+      
+      <button id="uploadFileBtn" class="btn btn-secondary text-xs">
+        <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+        <span>엑셀 업로드</span>
+      </button>
+
+      <button id="resetDataBtn" class="btn btn-secondary text-xs" title="기본 더미 데이터로 리셋">
+        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+        <span>기본값 복원</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs Bar -->
+  <div class="bg-gray-900/60 border-b border-gray-800 px-6 py-2 overflow-x-auto">
+    <div class="flex items-center gap-2 min-w-max">
+      <button class="nav-tab active" data-tab="overview">
+        <i data-lucide="layout-grid" class="w-4 h-4"></i>
+        <span>데이터 개요 & 기술통계</span>
+      </button>
+      <button class="nav-tab" data-tab="timeseries">
+        <i data-lucide="line-chart" class="w-4 h-4"></i>
+        <span>시계열 & 이상치 탐지</span>
+      </button>
+      <button class="nav-tab" data-tab="correlation">
+        <i data-lucide="grid" class="w-4 h-4"></i>
+        <span>상관관계 & 히트맵</span>
+      </button>
+      <button class="nav-tab" data-tab="regression">
+        <i data-lucide="trending-up" class="w-4 h-4"></i>
+        <span>선형 회귀분석</span>
+      </button>
+      <button class="nav-tab" data-tab="distribution">
+        <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+        <span>분포 & 정규성 검정</span>
+      </button>
+      <button class="nav-tab" data-tab="hypothesis">
+        <i data-lucide="split" class="w-4 h-4"></i>
+        <span>가설 검정 & 그룹 비교</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
+    
+    <!-- 1. TAB: Overview & Descriptive Stats -->
+    <section id="overview" class="tab-content active space-y-6">
+      <!-- Quick Metric Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="descriptiveStatsCards">
+        <!-- Injected via JS -->
+      </div>
+
+      <!-- Descriptive Stats Table Card -->
+      <div class="glass-card p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="calculator" class="w-4 h-4 text-blue-400"></i>
+            <h3 class="text-sm font-bold text-white">수치형 변수 전체 기술통계 요약표</h3>
+          </div>
+          <div class="flex items-center gap-4 text-xs text-gray-400">
+            <span>총 행 수: <strong id="totalRowCount" class="text-white">0</strong>건</span>
+            <span>변수 개수: <strong id="totalColCount" class="text-white">0</strong>개</span>
+          </div>
+        </div>
+
+        <div id="descriptiveStatsTable" class="data-table-container">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+
+      <!-- Raw Data Preview Table -->
+      <div class="glass-card p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="table" class="w-4 h-4 text-cyan-400"></i>
+            <h3 class="text-sm font-bold text-white">원시 데이터 미리보기 (상위 10개 행)</h3>
+          </div>
+          <span class="text-xs text-gray-400">드래그앤드롭으로 다른 엑셀 파일을 손쉽게 교체할 수 있습니다.</span>
+        </div>
+        <div class="data-table-container">
+          <table class="data-table">
+            <thead id="previewTableHead"></thead>
+            <tbody id="previewTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. TAB: Time Series & Anomaly Detection -->
+    <section id="timeseries" class="tab-content space-y-6">
+      <div class="glass-card p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-800 pb-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-400"></i>
+            <div>
+              <h3 class="text-sm font-bold text-white">시계열 추이 및 실시간 이상치(Anomaly) 탐지</h3>
+              <p class="text-xs text-gray-400">통계적 임계범위를 벗어나는 포인트를 실시간으로 식별합니다.</p>
+            </div>
+          </div>
+          <!-- Filters -->
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 text-xs text-gray-300">
+              <label>분석 변수:</label>
+              <select id="tsColSelect" class="text-xs"></select>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-gray-300">
+              <label>탐지 기법:</label>
+              <select id="tsAnomalyMethod" class="text-xs">
+                <option value="3sigma">3-Sigma (2.5σ 표준편차 밴드)</option>
+                <option value="iqr">IQR 1.5x (사분위수 밴드)</option>
+                <option value="ma">이동평균(Moving Average)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart Container -->
+        <div class="h-80 w-full relative">
+          <canvas id="timeSeriesCanvas"></canvas>
+        </div>
+
+        <!-- Insights -->
+        <div class="insight-box flex items-start justify-between gap-4">
+          <div class="text-xs text-gray-300 space-y-1" id="anomalyInsightText">
+            <!-- Injected via JS -->
+          </div>
+          <span id="anomalyCount" class="stat-badge badge-warning whitespace-nowrap">0건 감지됨</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. TAB: Correlation Matrix & Heatmap -->
+    <section id="correlation" class="tab-content space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Heatmap -->
+        <div class="glass-card p-5 lg:col-span-2 space-y-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="flame" class="w-4 h-4 text-rose-400"></i>
+            <h3 class="text-sm font-bold text-white">피어슨 상관계수 히트맵 (Pearson Correlation Matrix)</h3>
+          </div>
+          <div id="correlationHeatmapDiv" class="h-96 w-full"></div>
+        </div>
+
+        <!-- Top Correlations -->
+        <div class="glass-card p-5 space-y-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+            <h3 class="text-sm font-bold text-white">주요 변수 간 상관도 랭킹</h3>
+          </div>
+          <p class="text-xs text-gray-400">두 변수 간의 선형적 관련성의 강도를 자동으로 정렬합니다.</p>
+          <div id="topCorrelationsList" class="space-y-2">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. TAB: Linear Regression -->
+    <section id="regression" class="tab-content space-y-6">
+      <div class="glass-card p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-800 pb-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="trending-up" class="w-5 h-5 text-blue-400"></i>
+            <div>
+              <h3 class="text-sm font-bold text-white">단순 선형 회귀분석 (Simple Linear Regression)</h3>
+              <p class="text-xs text-gray-400">독립변수(X)와 종속변수(Y) 간의 선형적 인과관계를 모델링합니다.</p>
+            </div>
+          </div>
+          <!-- Variable Selection -->
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 text-xs text-gray-300">
+              <label>독립변수(X):</label>
+              <select id="regXSelect" class="text-xs"></select>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-gray-300">
+              <label>종속변수(Y):</label>
+              <select id="regYSelect" class="text-xs"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metrics Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="p-3.5 bg-gray-800/40 rounded-lg border border-gray-700/50">
+            <span class="text-xs text-gray-400 block mb-1">회귀 방정식 (Formula)</span>
+            <span id="regEquation" class="text-sm font-bold font-mono text-cyan-400">y = ax + b</span>
+          </div>
+          <div class="p-3.5 bg-gray-800/40 rounded-lg border border-gray-700/50">
+            <span class="text-xs text-gray-400 block mb-1">결정계수 ($R^2$ Score)</span>
+            <span id="regR2" class="text-lg font-bold font-mono text-emerald-400">0.000</span>
+          </div>
+          <div class="p-3.5 bg-gray-800/40 rounded-lg border border-gray-700/50">
+            <span class="text-xs text-gray-400 block mb-1">유의확률 (p-value)</span>
+            <span id="regPVal" class="text-lg font-bold font-mono text-purple-400">0.000</span>
+          </div>
+        </div>
+
+        <!-- Regression Scatter Chart -->
+        <div class="h-80 w-full relative">
+          <canvas id="regressionCanvas"></canvas>
+        </div>
+
+        <!-- Interpretation Box -->
+        <div class="insight-box text-xs text-gray-300" id="regInsightText">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. TAB: Distribution & Normality -->
+    <section id="distribution" class="tab-content space-y-6">
+      <div class="glass-card p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-800 pb-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="bar-chart" class="w-5 h-5 text-purple-400"></i>
+            <div>
+              <h3 class="text-sm font-bold text-white">데이터 분포 분석 및 정규성(Normality) 검정</h3>
+              <p class="text-xs text-gray-400">히스토그램, 박스플롯, Q-Q Plot을 통해 데이터의 분포 형태를 진단합니다.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-gray-300">
+            <label>분석 변수:</label>
+            <select id="distColSelect" class="text-xs"></select>
+          </div>
+        </div>
+
+        <!-- 3-Way Grid for Plots -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="glass-card p-4">
+            <h4 class="text-xs font-semibold text-gray-300 mb-2">1. 히스토그램 (Histogram)</h4>
+            <div id="distributionPlotDiv" class="h-64 w-full"></div>
+          </div>
+          <div class="glass-card p-4">
+            <h4 class="text-xs font-semibold text-gray-300 mb-2">2. 상자 그림 (Box Plot & Outliers)</h4>
+            <div id="boxPlotDiv" class="h-64 w-full"></div>
+          </div>
+          <div class="glass-card p-4">
+            <h4 class="text-xs font-semibold text-gray-300 mb-2">3. Q-Q Plot (정규 분위수 비교)</h4>
+            <div id="qqPlotDiv" class="h-64 w-full"></div>
+          </div>
+        </div>
+
+        <!-- Normality Insight -->
+        <div class="insight-box text-xs text-gray-300" id="normalityInsightText">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. TAB: Hypothesis Testing & Group Analysis -->
+    <section id="hypothesis" class="tab-content space-y-6">
+      <div class="glass-card p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-800 pb-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="split" class="w-5 h-5 text-emerald-400"></i>
+            <div>
+              <h3 class="text-sm font-bold text-white">가설 검정 & 그룹 비교 (t-Test / ANOVA)</h3>
+              <p class="text-xs text-gray-400">범주 그룹 간 측정치 평균의 통계적 유의차를 검증합니다.</p>
+            </div>
+          </div>
+          <!-- Variable Selectors -->
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 text-xs text-gray-300">
+              <label>수치 비교 변수:</label>
+              <select id="groupValColSelect" class="text-xs"></select>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-gray-300">
+              <label>그룹 기준 변수:</label>
+              <select id="groupCategoryColSelect" class="text-xs"></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Group Comparison Box Plot -->
+          <div class="glass-card p-4">
+            <h4 class="text-xs font-semibold text-gray-300 mb-2">그룹별 분포 비교 (Box & Mean)</h4>
+            <div id="groupComparisonPlotDiv" class="h-72 w-full"></div>
+          </div>
+
+          <!-- Statistical Test Result -->
+          <div id="hypothesisResultDiv" class="flex flex-col justify-center">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-800 py-3 px-6 text-center text-xs text-gray-500">
+    <span>클라이언트 메모리 전용 통계 분석 엔진 • 데이터 외부 전송 없음 (100% Client-Side Safe)</span>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="default_data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
